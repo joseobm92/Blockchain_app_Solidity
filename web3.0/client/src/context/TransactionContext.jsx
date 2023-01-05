@@ -27,12 +27,58 @@ export const TransactionProvider = ({ children }) => {
 
   const [currentAccount, setCurrentAccount] = useState("");
   const[formData, setFormData] = useState({addressTo: '', amount: '', keyword: '', message: ''});
-const [isLoading, setIsLoading] = useState(false);
-const [transactionCount, setTransactionCount] = useState(localStorage.getItem('transactionCount'))
+  const [isLoading, setIsLoading] = useState(false);
+  const [transactionCount, setTransactionCount] = useState(localStorage.getItem('transactionCount'));
+  const [transactions, setTransactions] = useState([]);
 
   const handleChange = (e, name) => {
     setFormData((prevState) => ({ ...prevState, [name]: e.target.value }))
-  }
+  };
+
+  
+
+  const getAllTransactions = async () => {
+    try {
+      if (ethereum) {
+        const transactionContract = getEthereumcontract();
+
+        const availableTransactions = await transactionContract.getAllTransactions();
+
+      
+
+        const structuredTransactions = availableTransactions.map((transaction) => ({
+          addressTo: transaction.receiver,
+          addressFrom: transaction.sender,
+          timestamp: new Date(transaction.timestamp.toNumber() * 1000).toLocaleString(),
+          message: transaction.message,
+          keyword: transaction.keywork,
+          amount: parseInt(transaction.amount._hex) / (10 ** 18)
+        }));
+
+        setTransactions (structuredTransactions);
+      } else {
+        console.log("Ethereum is not present");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const checkIfTransactionsExists = async () => {
+    try {
+      if (ethereum) {
+        const transactionContract = getEthereumcontract();
+        const currentTransactionCount = await transactionContract.getTransactionCount();
+
+        window.localStorage.setItem("transactionCount", currentTransactionCount);
+      }
+    } catch (error) {
+      console.log(error);
+
+      // throw new Error("No ethereum object");
+    }
+  };
+
 
   const checkIfWalletIsConnected = async () => {
     try {
@@ -42,7 +88,7 @@ const [transactionCount, setTransactionCount] = useState(localStorage.getItem('t
 
       if (accounts.length) {
         setCurrentAccount(accounts[0]);
-        //getAllTransactions();
+        getAllTransactions();
       } else {
         console.log("No accounts found");
       }
@@ -57,7 +103,8 @@ const [transactionCount, setTransactionCount] = useState(localStorage.getItem('t
 
   useEffect(() => {
     checkIfWalletIsConnected();
-  }, ['']);
+    checkIfTransactionsExists();
+  }, [transactionCount]);
 
   const connectWallet = async () => {
     try {
@@ -113,7 +160,7 @@ const [transactionCount, setTransactionCount] = useState(localStorage.getItem('t
   }
 
   return (
-    <TransactionContext.Provider value={{ connectWallet, currentAccount, formData, setFormData, handleChange, sendTransaction }}>
+    <TransactionContext.Provider value={{ connectWallet, currentAccount, formData, setFormData, handleChange, sendTransaction, transactions, isLoading }}>
       {children}
     </TransactionContext.Provider>
   );
